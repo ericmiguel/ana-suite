@@ -1,0 +1,71 @@
+[project]
+name = "ana-suite"
+version = "0.1.0"
+description = "Incremental Parquet collection of ANA hydrometeorological station data"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "geopandas>=1.0",
+    "httpx",
+    "pandas>=2.0",
+    "polars>=1.0",
+    "pyarrow>=14.0",
+    "shapely>=2.0",
+    "zeep>=4.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyrefly",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.4,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "ana"
+
+[tool.ruff]
+required-version = ">=0.15.20"
+target-version = "py312"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "UP", "SIM", "I", "N", "ARG", "PTH", "TC", "RET", "RUF"]
+fixable = ["ALL"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+lines-after-imports = 2
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**.py" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+addopts = "-m 'not network'"
+markers = ["network: optional ANA service smoke test"]
+testpaths = ["tests"]
+
+[tool.pyrefly]
+preset = "strict"
+project-includes = ["src", "tests"]
+project-excludes = ["**/.venv/**", "**/__pycache__/**", "**/dist/**"]
+use-ignore-files = true
+search-path = ["src", "tests"]
+disable-search-path-heuristics = true
+enable-fallback-search-path = false
+python-version = "3.12"
+min-severity = "error"
+output-format = "github"
+check-unannotated-defs = true
+infer-return-types = "checked"
+strict-callable-subtyping = true
+skip-lsp-config-indexing = true
