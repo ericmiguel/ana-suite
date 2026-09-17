@@ -21,6 +21,7 @@ from ana.events import PipelineListener
 from ana.events import RequestPlanned
 from ana.events import StationResolved
 from ana.events import StorePlanned
+from ana.exceptions import AnaDownloadError
 from ana.exceptions import AnaValidationError
 from ana.intervals import find_fetch_targets
 from ana.intervals import merge_checked_ranges
@@ -212,12 +213,14 @@ class Experiment:
         active = request.is_live and request.station_type_name == "telemetric"
         inventory = self.cache.load_inventory(active=active)
         age = self.cache.inventory_age_days(active=active)
-        if inventory is None or age is None or age > self.inventory_ttl_days:
+        if not inventory or age is None or age > self.inventory_ttl_days:
             inventory = (
                 self.downloader.fetch_active_inventory()
                 if active
                 else self.downloader.fetch_inventory()
             )
+            if not inventory:
+                raise AnaDownloadError("ANA returned an empty station inventory.")
             self.cache.save_inventory(inventory, active=active)
             self._cache_changed = True
         selected = select_stations(inventory, request.selection)
