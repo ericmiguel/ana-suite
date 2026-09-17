@@ -78,7 +78,7 @@ def parse_conventional(payload: bytes, data_type: str) -> pl.DataFrame | None:
             day = int(column.removeprefix(variable))
             records.append(
                 {
-                    "datetime": f"{base}T00:00:00",
+                    "datetime": base,
                     "day": day,
                     "value": _number_or_none(row.get(column)),
                 }

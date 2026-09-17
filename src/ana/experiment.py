@@ -409,7 +409,10 @@ def _unique_stations(groups: Iterable[Iterable[Station]]) -> list[Station]:
 
 
 def _stations_frame(stations: list[Station]) -> pl.DataFrame:
-    return pl.DataFrame([station.__dict__ for station in stations])
+    return pl.DataFrame(
+        [station.__dict__ for station in stations],
+        infer_schema_length=None,
+    ).rename({"code": "station_code"})
 
 
 def _min_date(current: str | None, value: dt.datetime | None) -> str | None:

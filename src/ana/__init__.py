@@ -37,9 +37,14 @@ from ana.retrieval import AnaProvider
 from ana.retrieval import FetchResult
 from ana.root import ProjectRootNotFoundError
 from ana.root import resolve_project_root
+from ana.store import OBSERVATIONS_TABLE
+from ana.store import STATIONS_TABLE
+from ana.store import read_table
 
 
 __all__ = [
+    "OBSERVATIONS_TABLE",
+    "STATIONS_TABLE",
     "AnaClient",
     "AnaDownloadError",
     "AnaError",
@@ -72,5 +77,6 @@ __all__ = [
     "find_unchecked_gaps",
     "merge_checked_ranges",
     "read_region",
+    "read_table",
     "resolve_project_root",
 ]

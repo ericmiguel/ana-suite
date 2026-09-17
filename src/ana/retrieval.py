@@ -4,10 +4,13 @@ import logging
 import threading
 import time
 import xml.etree.ElementTree as ET
+from calendar import monthrange
+from datetime import date
 from enum import StrEnum
 from typing import Protocol
 
 import polars as pl
+from polars.exceptions import PolarsError
 from requests import Session
 from zeep import Client
 from zeep import Settings
@@ -97,15 +100,29 @@ class AnaClient:
                 )
                 frame = parse_telemetric(payload, variable_name)
             else:
+                request_start, request_end = _month_bounds(start, end)
                 payload = self._call(
                     "HidroSerieHistorica",
                     codEstacao=station.code,
-                    dataInicio=start,
-                    dataFim=end,
+                    dataInicio=request_start,
+                    dataFim=request_end,
                     tipoDados=data_type,
                 )
                 frame = parse_conventional(payload, data_type)
-        except (AnaDownloadError, ET.ParseError, OSError, TimeoutError, ValueError):
+                if frame is not None:
+                    frame = frame.filter(
+                        pl.col("datetime")
+                        .dt.date()
+                        .is_between(date.fromisoformat(start), date.fromisoformat(end))
+                    )
+        except (
+            AnaDownloadError,
+            ET.ParseError,
+            OSError,
+            PolarsError,
+            TimeoutError,
+            ValueError,
+        ):
             logger.warning("ANA query failed for station %s", station.code)
             return FetchResult.ERROR, None
         if frame is None or frame.is_empty():
@@ -144,3 +161,12 @@ def _rate_limit() -> None:
     if remaining > 0:
         time.sleep(remaining)
     _thread_local.last_call = time.monotonic()
+
+
+def _month_bounds(start: str, end: str) -> tuple[str, str]:
+    """Expand a conventional request to the complete calendar months."""
+    start_day = date.fromisoformat(start[:10])
+    end_day = date.fromisoformat(end[:10])
+    first = start_day.replace(day=1)
+    last = end_day.replace(day=monthrange(end_day.year, end_day.month)[1])
+    return first.isoformat(), last.isoformat()

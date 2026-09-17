@@ -82,3 +82,6 @@ def test_store_is_parquet_and_emits_write_event(tmp_path: Path) -> None:
     observations = experiment.open("observations")
     assert isinstance(observations, pl.DataFrame)
     assert observations.select("station_code").to_series().to_list() == ["A"]
+    stations = experiment.open("stations")
+    assert isinstance(stations, pl.DataFrame)
+    assert stations.select("station_code").to_series().to_list() == ["A"]
