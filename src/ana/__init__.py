@@ -9,6 +9,7 @@ from ana.cache import StationMeta
 from ana.cache import experiment_cache_dir
 from ana.cache import experiment_cache_key
 from ana.cache import experiment_store_path
+from ana.contours import read_region
 from ana.events import ItemWritten
 from ana.events import PipelineEvent
 from ana.events import PipelineListener
@@ -26,6 +27,7 @@ from ana.models import AnaRequest
 from ana.models import Area
 from ana.models import GeometryFile
 from ana.models import LiveHorizon
+from ana.models import Region
 from ana.models import Station
 from ana.models import StationCodes
 from ana.models import StationType
@@ -53,6 +55,7 @@ __all__ = [
     "PipelineEvent",
     "PipelineListener",
     "ProjectRootNotFoundError",
+    "Region",
     "RequestPlanned",
     "Station",
     "StationCache",
@@ -68,5 +71,6 @@ __all__ = [
     "find_fetch_targets",
     "find_unchecked_gaps",
     "merge_checked_ranges",
+    "read_region",
     "resolve_project_root",
 ]

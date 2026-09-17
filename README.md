@@ -7,12 +7,12 @@ collection is exposed through typed Python requests and `Experiment`.
 ```python
 from datetime import date
 
-from ana import AnaRequest, Experiment, LiveHorizon, StationCodes
+from ana import AnaRequest, Experiment, LiveHorizon, Region
 
 experiment = Experiment(
     name="sao_paulo_rain",
     rainfall=AnaRequest(
-        selection=StationCodes(("2345000",)),
+        selection=Region.BRAZIL,
         start=date(2020, 1, 1),
         end=LiveHorizon.TODAY,
         variable="chuva",
@@ -26,7 +26,9 @@ observations = experiment.open("observations")
 ## Data model
 
 `AnaRequest` selects a variable, period, station type, and optionally station
-codes, a bounding box, or a vector geometry. Omitting the selection keeps the
+codes, a bounding box, a built-in Brazilian region, or a vector geometry. The
+embedded `Region.BRAZIL` selects the whole country; `Region.SP`, `Region.MG`,
+and the other UF members select one state. Omitting the selection keeps the
 whole ANA inventory. `LiveHorizon.TODAY` is deliberately part of the request
 identity, not the resolved date, so repeated runs extend one experiment instead
 of creating a new cache.

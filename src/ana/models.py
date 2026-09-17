@@ -33,6 +33,39 @@ class LiveHorizon(StrEnum):
     TODAY = "today"
 
 
+class Region(StrEnum):
+    """Built-in Brazilian regions from the embedded UF contour."""
+
+    BRAZIL = "BR"
+    AC = "AC"
+    AL = "AL"
+    AP = "AP"
+    AM = "AM"
+    BA = "BA"
+    CE = "CE"
+    DF = "DF"
+    ES = "ES"
+    GO = "GO"
+    MA = "MA"
+    MT = "MT"
+    MS = "MS"
+    MG = "MG"
+    PA = "PA"
+    PB = "PB"
+    PR = "PR"
+    PE = "PE"
+    PI = "PI"
+    RJ = "RJ"
+    RN = "RN"
+    RS = "RS"
+    RO = "RO"
+    RR = "RR"
+    SC = "SC"
+    SP = "SP"
+    SE = "SE"
+    TO = "TO"
+
+
 @dataclass(frozen=True, kw_only=True)
 class Station:
     """One station from the ANA inventory."""
@@ -117,7 +150,7 @@ class GeometryFile:
         return sha256(self.path.read_bytes()).hexdigest()
 
 
-type StationSelection = StationCodes | Area | GeometryFile
+type StationSelection = StationCodes | Area | GeometryFile | Region
 
 
 @dataclass(frozen=True, kw_only=True)

@@ -7,3 +7,6 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 data/
+!src/ana/data/
+!src/ana/data/shapes/
+!src/ana/data/shapes/*
