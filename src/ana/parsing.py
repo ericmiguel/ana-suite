@@ -56,6 +56,31 @@ def parse_inventory(payload: bytes) -> list[Station]:
     return stations
 
 
+def parse_active_inventory(payload: bytes) -> list[Station]:
+    """Parse the active ``ListaEstacoesTelemetricas`` response."""
+    stations: list[Station] = []
+    for table in _TABLE.findall(payload.decode("utf-8")):
+        row = dict(_TAG.findall(table))
+        code = row.get("CodEstacao", "").strip()
+        if not code or not row.get("Latitude") or not row.get("Longitude"):
+            continue
+        stations.append(
+            Station(
+                code=code,
+                name=row.get("NomeEstacao", "").strip(),
+                latitude=_number(row["Latitude"]),
+                longitude=_number(row["Longitude"]),
+                station_type="telemetric",
+                municipality=row.get("Municipio-UF"),
+                basin=row.get("Bacia"),
+                subbasin=row.get("SubBacia"),
+                river=row.get("NomeRio"),
+                responsible=row.get("Responsavel"),
+            )
+        )
+    return stations
+
+
 def parse_conventional(payload: bytes, data_type: str) -> pl.DataFrame | None:
     """Parse a daily ``HidroSerieHistorica`` response."""
     rows = [
@@ -115,7 +140,9 @@ def parse_telemetric(payload: bytes, variable: str) -> pl.DataFrame | None:
         return None
     return (
         pl.DataFrame(records)
-        .with_columns(pl.col("datetime").str.to_datetime(strict=False))
+        .with_columns(
+            pl.col("datetime").str.strip_chars().str.to_datetime(strict=False)
+        )
         .drop_nulls("value")
         .unique(subset=["datetime"], keep="last")
         .sort("datetime")

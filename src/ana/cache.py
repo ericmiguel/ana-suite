@@ -118,25 +118,32 @@ class StationCache:
         """Return the cached inventory path."""
         return self.path / "inventory.json"
 
-    def inventory_age_days(self) -> float | None:
+    @property
+    def active_inventory_file(self) -> Path:
+        """Return the cached active telemetry inventory path."""
+        return self.path / "active_inventory.json"
+
+    def inventory_age_days(self, *, active: bool = False) -> float | None:
         """Return inventory age in days, or ``None`` when absent."""
-        if not self.inventory_file.is_file():
+        path = self.active_inventory_file if active else self.inventory_file
+        if not path.is_file():
             return None
-        modified = dt.datetime.fromtimestamp(self.inventory_file.stat().st_mtime)
+        modified = dt.datetime.fromtimestamp(path.stat().st_mtime)
         return (dt.datetime.now() - modified).total_seconds() / 86400
 
-    def load_inventory(self) -> list[Station] | None:
+    def load_inventory(self, *, active: bool = False) -> list[Station] | None:
         """Load the cached station inventory."""
-        if not self.inventory_file.is_file():
+        path = self.active_inventory_file if active else self.inventory_file
+        if not path.is_file():
             return None
-        payload = json.loads(self.inventory_file.read_text())
+        payload = json.loads(path.read_text())
         return [Station(**item) for item in payload]
 
-    def save_inventory(self, stations: list[Station]) -> None:
+    def save_inventory(self, stations: list[Station], *, active: bool = False) -> None:
         """Atomically save the station inventory."""
         self.path.mkdir(parents=True, exist_ok=True)
         _atomic_text(
-            self.inventory_file,
+            self.active_inventory_file if active else self.inventory_file,
             json.dumps([dataclasses.asdict(item) for item in stations], indent=2),
         )
 

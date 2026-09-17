@@ -209,11 +209,16 @@ class Experiment:
         }
 
     def _stations(self, request: AnaRequest) -> list[Station]:
-        inventory = self.cache.load_inventory()
-        age = self.cache.inventory_age_days()
+        active = request.is_live and request.station_type_name == "telemetric"
+        inventory = self.cache.load_inventory(active=active)
+        age = self.cache.inventory_age_days(active=active)
         if inventory is None or age is None or age > self.inventory_ttl_days:
-            inventory = self.downloader.fetch_inventory()
-            self.cache.save_inventory(inventory)
+            inventory = (
+                self.downloader.fetch_active_inventory()
+                if active
+                else self.downloader.fetch_inventory()
+            )
+            self.cache.save_inventory(inventory, active=active)
             self._cache_changed = True
         selected = select_stations(inventory, request.selection)
         if request.station_type is not None:

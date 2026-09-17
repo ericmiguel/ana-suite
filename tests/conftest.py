@@ -18,6 +18,9 @@ class FakeProvider:
     def fetch_inventory(self) -> list[Station]:
         return list(self.stations)
 
+    def fetch_active_inventory(self) -> list[Station]:
+        return list(self.stations)
+
     def fetch_series(
         self, station: Station, start: str, end: str, variable: str
     ) -> tuple[FetchResult, pl.DataFrame | None]:

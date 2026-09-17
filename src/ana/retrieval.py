@@ -18,6 +18,7 @@ from zeep.transports import Transport
 
 from ana.exceptions import AnaDownloadError
 from ana.models import Station
+from ana.parsing import parse_active_inventory
 from ana.parsing import parse_conventional
 from ana.parsing import parse_inventory
 from ana.parsing import parse_telemetric
@@ -39,6 +40,8 @@ class AnaProvider(Protocol):
     """Provider used by :class:`ana.Experiment` and test fakes."""
 
     def fetch_inventory(self) -> list[Station]: ...
+
+    def fetch_active_inventory(self) -> list[Station]: ...
 
     def fetch_series(
         self, station: Station, start: str, end: str, variable: str
@@ -81,6 +84,15 @@ class AnaClient:
             )
         }
         return parse_inventory(self._call("HidroInventario", **params))
+
+    def fetch_active_inventory(self) -> list[Station]:
+        """Fetch stations marked active by the telemetry service."""
+        payload = self._call(
+            "ListaEstacoesTelemetricas",
+            statusEstacoes="0",
+            origem="",
+        )
+        return parse_active_inventory(payload)
 
     def fetch_series(
         self, station: Station, start: str, end: str, variable: str
