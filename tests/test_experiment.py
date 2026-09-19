@@ -43,7 +43,7 @@ def test_fixed_request_reuses_covered_interval(tmp_path: Path) -> None:
     assert provider.calls[0][1:3] == ("2020-01-01", "2020-01-03")
 
 
-def test_live_request_refreshes_only_mutable_tail(tmp_path: Path) -> None:
+def test_live_request_skips_recent_mutable_tail(tmp_path: Path) -> None:
     provider = FakeProvider([_station("A")])
     experiment = Experiment(
         name="live",
@@ -54,6 +54,25 @@ def test_live_request_refreshes_only_mutable_tail(tmp_path: Path) -> None:
         ),
         downloader=provider,
         root_dir=tmp_path,
+    )
+    experiment.download()
+    first_count = len(provider.calls)
+    experiment.download()
+    assert len(provider.calls) == first_count
+
+
+def test_live_request_refreshes_stale_mutable_tail(tmp_path: Path) -> None:
+    provider = FakeProvider([_station("A")])
+    experiment = Experiment(
+        name="live",
+        main=AnaRequest(
+            selection=StationCodes(codes=("A",)),
+            start=date.today() - timedelta(days=5),
+            end=LiveHorizon.TODAY,
+        ),
+        downloader=provider,
+        root_dir=tmp_path,
+        active_tail_ttl=timedelta(0),
     )
     experiment.download()
     first_count = len(provider.calls)

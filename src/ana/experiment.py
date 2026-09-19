@@ -45,6 +45,8 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_TTL_SCHEDULE = ((30, 1), (365, 3), (99999, 7))
 DEFAULT_UNKNOWN_TTL_DAYS = 30
 DEFAULT_INVENTORY_TTL_DAYS = 7
+DEFAULT_ACTIVE_TAIL_TTL = dt.timedelta(hours=1)
+DEFAULT_MAX_WORKERS = 4
 MAX_CONSECUTIVE_ERRORS = 3
 ERROR_COOLDOWN = dt.timedelta(days=1)
 
@@ -61,6 +63,7 @@ class Experiment:
         inventory_ttl_days: int = DEFAULT_INVENTORY_TTL_DAYS,
         unknown_ttl_days: int = DEFAULT_UNKNOWN_TTL_DAYS,
         ttl_schedule: tuple[tuple[int, int], ...] = DEFAULT_TTL_SCHEDULE,
+        active_tail_ttl: dt.timedelta = DEFAULT_ACTIVE_TAIL_TTL,
         **requests: AnaRequest,
     ) -> None:
         if not name.strip():
@@ -79,6 +82,7 @@ class Experiment:
         self.inventory_ttl_days = inventory_ttl_days
         self.unknown_ttl_days = unknown_ttl_days
         self.ttl_schedule = ttl_schedule
+        self.active_tail_ttl = active_tail_ttl
         self._selected: dict[str, list[Station]] = {}
         self._cache_changed = False
         self._downloaded = False
@@ -109,17 +113,25 @@ class Experiment:
         *,
         refresh: bool = False,
         update_active: bool = True,
-        max_workers: int = 5,
+        fetch: bool = True,
+        max_workers: int = DEFAULT_MAX_WORKERS,
         listener: PipelineListener | None = None,
     ) -> tuple[Path, ...]:
-        """Incrementally collect all requests and return cached station files."""
+        """Incrementally collect all requests and return cached station files.
+
+        With ``fetch=False`` the experiment selects stations from the cached
+        inventory and materializes the store from the existing fragments
+        without any network call.
+        """
         self._cache_changed = False
         paths: set[Path] = set()
         for request_name, request in self.requests.items():
-            stations = self._stations(request)
+            stations = self._stations(request, fetch=fetch)
             self._selected[request_name] = stations
             if listener is not None:
                 listener(RequestPlanned(name=request_name, stations=len(stations)))
+            if not fetch:
+                continue
             tasks = self._tasks(request, stations, refresh, update_active)
             self._run_tasks(
                 request_name,
@@ -197,7 +209,7 @@ class Experiment:
         *,
         variable: str = "chuva",
         probe_days: int = 30,
-        max_workers: int = 20,
+        max_workers: int = DEFAULT_MAX_WORKERS,
         listener: PipelineListener | None = None,
     ) -> dict[str, StationMeta]:
         """Probe a recent window to update station availability metadata."""
@@ -223,11 +235,15 @@ class Experiment:
             for station in stations
         }
 
-    def _stations(self, request: AnaRequest) -> list[Station]:
+    def _stations(self, request: AnaRequest, *, fetch: bool = True) -> list[Station]:
         active = request.is_live and request.station_type_name == "telemetric"
         inventory = self.cache.load_inventory(active=active)
         age = self.cache.inventory_age_days(active=active)
         if not inventory or age is None or age > self.inventory_ttl_days:
+            if not fetch:
+                raise AnaDownloadError(
+                    "Offline run requires a cached station inventory."
+                )
             inventory = (
                 self.downloader.fetch_active_inventory()
                 if active
@@ -265,6 +281,8 @@ class Experiment:
                 result.append((station, start, end))
                 continue
             if update_active and meta.status == "active" and request.is_live:
+                if not self._tail_stale(meta):
+                    continue
                 mutable_start = max(
                     request.start,
                     request.resolved_end - dt.timedelta(days=1),
@@ -391,6 +409,13 @@ class Experiment:
             and dt.datetime.now() - dt.datetime.fromisoformat(meta.last_checked)
             < ERROR_COOLDOWN
         )
+
+    def _tail_stale(self, meta: StationMeta) -> bool:
+        """Return whether the mutable tail is old enough to re-query."""
+        if meta.last_checked is None:
+            return True
+        age = dt.datetime.now() - dt.datetime.fromisoformat(meta.last_checked)
+        return age >= self.active_tail_ttl
 
     def _observations(self, stations: list[Station]) -> pl.DataFrame:
         frames: list[pl.DataFrame] = []
