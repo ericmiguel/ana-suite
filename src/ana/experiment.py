@@ -3,6 +3,7 @@
 import datetime as dt
 import logging
 from collections.abc import Iterable
+from collections.abc import Mapping
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -13,9 +14,11 @@ import polars as pl
 
 from ana.cache import StationCache
 from ana.cache import StationMeta
-from ana.cache import experiment_cache_dir
-from ana.cache import experiment_cache_key
-from ana.cache import experiment_store_path
+from ana.cache import default_namespace
+from ana.cache import legend_payload
+from ana.cache import normalize_dataclass
+from ana.cache import request_fingerprint
+from ana.cache import summarize_coverage
 from ana.events import ItemWritten
 from ana.events import PipelineListener
 from ana.events import RequestPlanned
@@ -69,10 +72,9 @@ class Experiment:
         self.name = name
         self.requests = dict(requests)
         self.root_dir = resolve_project_root(root_dir)
-        self._cache_key = experiment_cache_key(name, self.requests)
-        self.cache = StationCache(
-            experiment_cache_dir(self.root_dir / ".cache", self._cache_key)
-        )
+        self._namespace = default_namespace(self.root_dir, name)
+        self._fingerprint = request_fingerprint(self.requests)
+        self.cache = StationCache(self._namespace.pool_dir / "stations")
         self.downloader = downloader or AnaClient()
         self.inventory_ttl_days = inventory_ttl_days
         self.unknown_ttl_days = unknown_ttl_days
@@ -84,18 +86,23 @@ class Experiment:
 
     @property
     def cache_key(self) -> str:
-        """Return the isolated experiment cache key."""
-        return self._cache_key
+        """Return the request fingerprint (legacy name kept for callers)."""
+        return self._fingerprint
+
+    @property
+    def fingerprint(self) -> str:
+        """Return the request fingerprint that identifies the store."""
+        return self._fingerprint
 
     @property
     def cache_path(self) -> Path:
-        """Return the isolated incremental cache directory."""
-        return self.cache.path
+        """Return the source-global fragment pool directory."""
+        return self._namespace.pool_dir
 
     @property
     def store_path(self) -> Path:
-        """Return the canonical Parquet store path."""
-        return experiment_store_path(self.root_dir / "data", self._cache_key)
+        """Return the store path for this request fingerprint."""
+        return self._namespace.store_path(self._fingerprint)
 
     def download(
         self,
@@ -147,6 +154,13 @@ class Experiment:
             overwrite=overwrite or self._cache_changed,
         )
         self._cache_changed = False
+        self._namespace.record_store(
+            self._fingerprint,
+            requests=_requests_identity(self.requests),
+            coverage=summarize_coverage(self.requests),
+            provenance=legend_payload(),
+            now=dt.datetime.now(dt.UTC).isoformat(),
+        )
         if listener is not None:
             listener(ItemWritten(description=str(destination)))
         return destination
@@ -439,3 +453,13 @@ def _max_date(current: str | None, value: dt.datetime | None) -> str | None:
         if current is None or (candidate is not None and candidate > current)
         else current
     )
+
+
+def _requests_identity(requests: Mapping[str, object]) -> dict[str, object]:
+    return {
+        name: {
+            "type": type(request).__qualname__,
+            "fields": normalize_dataclass(request),
+        }
+        for name, request in sorted(requests.items())
+    }

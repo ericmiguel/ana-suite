@@ -78,6 +78,12 @@ def test_store_is_parquet_and_emits_write_event(tmp_path: Path) -> None:
     events = []
     store = experiment.to_parquet(listener=events.append)
     assert store.is_dir()
+    assert store == experiment.store_path
+    assert store.suffix == ".parquet"
+    assert store.parent.name == "store"
+    assert store.parent.parent.name == "ana"
+    assert experiment.cache_path == tmp_path / ".cache" / "fragments" / "ana" / "v2"
+    assert (store.parent / "manifest.json").is_file()
     assert any(isinstance(event, StorePlanned) for event in events)
     observations = experiment.open("observations")
     assert isinstance(observations, pl.DataFrame)

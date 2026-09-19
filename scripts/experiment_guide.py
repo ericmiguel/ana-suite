@@ -76,7 +76,7 @@ def build_experiment(
     end
         Fixed last calendar day, or ``None`` for the stable live horizon.
     root_dir
-        Directory receiving ``.cache/ana`` and ``data/ana``.
+        Directory receiving the ``.cache`` fragment pool and store namespace.
     """
     request_end = LiveHorizon.TODAY if end is None else end
     return Experiment(

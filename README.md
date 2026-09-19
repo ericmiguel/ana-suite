@@ -34,8 +34,12 @@ identity, not the resolved date, so repeated runs extend one experiment instead
 of creating a new cache.
 
 The canonical store is written at
-`data/ana/<cache-key>.parquet/`, with `stations` and partitioned `observations`
-tables. The raw station cache lives at `.cache/ana/<cache-key>/`.
+`.cache/stores/ana/<name>/<fingerprint>.parquet/`, with `stations` and
+partitioned `observations` tables. The raw per-station incremental files live
+in the source-global pool at `.cache/fragments/ana/v2/stations/`, shared by
+every namespace, so two experiments that select the same stations reuse the
+same downloaded fragments. The store's `manifest.json` records the request
+fingerprint, coverage, and provenance that produced it.
 
 ## Incremental and live cache
 

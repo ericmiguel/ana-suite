@@ -1,23 +1,23 @@
-"""Experiment identity and incremental station cache persistence."""
+"""Atomic incremental station cache: inventory, metadata, and observations."""
+
+from __future__ import annotations
 
 import dataclasses
 import datetime as dt
-import hashlib
 import json
 import threading
-from collections.abc import Mapping
 from dataclasses import dataclass
 from dataclasses import field
-from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import polars as pl
 
 from ana.models import Station
 
 
-CACHE_SCHEMA_VERSION = 1
-CACHE_SOURCE = "ana"
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 
 @dataclass
@@ -34,7 +34,7 @@ class StationMeta:
     consecutive_errors: int = 0
 
     @classmethod
-    def create(cls, code: str, variable: str) -> "StationMeta":
+    def create(cls, code: str, variable: str) -> StationMeta:
         """Create state for a station that has not been queried."""
         return cls(code=code, variable=variable)
 
@@ -52,7 +52,7 @@ class StationMeta:
         }
 
     @classmethod
-    def from_payload(cls, payload: Mapping[str, object]) -> "StationMeta":
+    def from_payload(cls, payload: Mapping[str, object]) -> StationMeta:
         """Build state from a persisted payload."""
         raw_ranges = payload.get("checked_ranges", [])
         ranges: list[tuple[str, str, str]] = []
@@ -76,34 +76,6 @@ class StationMeta:
             last_checked=_optional_string(payload.get("last_checked")),
             consecutive_errors=consecutive_errors,
         )
-
-
-def experiment_cache_key(name: str, requests: Mapping[str, object]) -> str:
-    """Return a stable SHA-256 identity for named typed requests."""
-    identity = {
-        "schema": CACHE_SCHEMA_VERSION,
-        "source": CACHE_SOURCE,
-        "name": name,
-        "requests": {
-            request_name: {
-                "type": type(request).__qualname__,
-                "fields": _normalize(request),
-            }
-            for request_name, request in sorted(requests.items())
-        },
-    }
-    encoded = json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
-def experiment_cache_dir(cache_root: Path, cache_key: str) -> Path:
-    """Return one isolated ANA cache directory."""
-    return Path(cache_root) / CACHE_SOURCE / cache_key
-
-
-def experiment_store_path(data_root: Path, cache_key: str) -> Path:
-    """Return one canonical ANA Parquet directory."""
-    return Path(data_root) / CACHE_SOURCE / f"{cache_key}.parquet"
 
 
 class StationCache:
@@ -203,26 +175,3 @@ def _atomic_text(path: Path, content: str) -> None:
 
 def _optional_string(value: object) -> str | None:
     return value if isinstance(value, str) else None
-
-
-def _normalize(value: object) -> object:
-    if isinstance(value, Enum):
-        return value.value
-    if isinstance(value, (dt.date, dt.datetime)):
-        return value.isoformat()
-    if isinstance(value, Path):
-        return str(value)
-    if hasattr(value, "digest"):
-        return {"type": type(value).__qualname__, "sha256": value.digest}
-    if dataclasses.is_dataclass(value):
-        return {
-            item.name: _normalize(getattr(value, item.name))
-            for item in dataclasses.fields(value)
-        }
-    if isinstance(value, Mapping):
-        return {
-            str(key): _normalize(item) for key, item in sorted(value.items(), key=str)
-        }
-    if isinstance(value, (tuple, list)):
-        return [_normalize(item) for item in value]
-    return value
